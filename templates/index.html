@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Dự đoán giá vàng</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    h2 { margin-top: 40px; }
+    .chart { width: 100%; height: 400px; }
+    .flex-container { display: flex; flex-direction: row; gap: 20px; }
+    .half-chart { width: 50%; }
+  </style>
+</head>
+<body>
+  <h2>Biểu đồ lịch sử giá vàng (90 ngày gần nhất)</h2>
+  <div id="history-chart" class="chart"></div>
+
+  <div class="flex-container">
+    <div class="half-chart">
+      <h2>Dự đoán 3 ngày tiếp theo</h2>
+      <div id="forecast-3" class="chart"></div>
+    </div>
+    <div class="half-chart">
+      <h2>Dự đoán 5 ngày tiếp theo</h2>
+      <div id="forecast-5" class="chart"></div>
+    </div>
+  </div>
+
+  <script>
+    let recentDates = [];
+    let recentPrices = [];
+
+    async function drawHistoryChart() {
+      const res = await fetch("/api/history");
+      const data = await res.json();
+
+      const dates = data.map(item => item.Date);
+      const prices = data.map(item => item.Close);
+
+      recentDates = dates.slice(-5);
+      recentPrices = prices.slice(-5);
+
+      Plotly.newPlot("history-chart", [{
+        x: dates,
+        y: prices,
+        mode: "lines",
+        name: "Lịch sử giá vàng",
+        line: { color: "#1f77b4" }
+      }], {
+        xaxis: {
+          rangeslider: {
+            visible: true,
+            thickness: 0.05,  // làm thanh trượt mỏng
+            bgcolor: "#eee",  // màu nền thanh trượt
+            bordercolor: "#ccc"
+          },
+          showgrid: false,
+          fixedrange: false
+        },
+        yaxis: {
+          title: "Giá (USD)",
+          showgrid: true
+        },
+        margin: { t: 10 }
+      });
+    }
+
+    async function drawForecastChart(days, divId) {
+      const res = await fetch(`/api/predict/${days}`);
+      const forecast = await res.json();
+
+      const lastDate = new Date(recentDates.at(-1));
+      const futureDates = [];
+
+      for (let i = 1; i <= days; i++) {
+        const d = new Date(lastDate);
+        d.setDate(d.getDate() + i);
+        futureDates.push(d.toISOString().split('T')[0]);
+      }
+
+      // Tạo đường nối nét đứt từ ngày cuối thực tế tới ngày đầu dự đoán
+      const connector = {
+        x: [recentDates.at(-1), futureDates[0]],
+        y: [recentPrices.at(-1), forecast[0]],
+        mode: "lines",
+        name: "Nối dự đoán",
+        line: { dash: "dot", color: "#d62728" },
+        showlegend: false
+      };
+
+      const traceRecent = {
+        x: recentDates,
+        y: recentPrices,
+        mode: "lines+markers",
+        name: "5 ngày gần nhất",
+        line: { color: "#1f77b4" }
+      };
+
+      const traceForecast = {
+        x: futureDates,
+        y: forecast,
+        mode: "lines+markers",
+        name: `${days} ngày dự đoán`,
+        line: { dash: "dash", color: "orange" }
+      };
+
+      Plotly.newPlot(divId, [traceRecent, connector, traceForecast], {
+        yaxis: { title: "Giá (USD)" },
+        margin: { t: 40 }
+      });
+    }
+
+    async function init() {
+      await drawHistoryChart();
+      drawForecastChart(3, "forecast-3");
+      drawForecastChart(5, "forecast-5");
+    }
+
+    init();
+  </script>
+
+</body>
+</html>
