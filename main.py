@@ -26,10 +26,3 @@ def predict(days):
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=3000)
 
-
-from gold_data import get_history_for_chart
-
-@app.route("/api/history")
-def history():
-    return jsonify(get_history_for_chart())
-
